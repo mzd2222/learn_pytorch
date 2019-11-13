@@ -136,6 +136,7 @@ class DQN(object):
         b_s_ = torch.FloatTensor(b_memory[:, -N_STATES:])
 
         # q_eval w.r.t the action in experience
+        print('b_s:', self.eval_net(b_s).size(), 'b_a', b_a.size())
         q_eval = self.eval_net(b_s).gather(1, b_a)  # shape (batch, 1)
         q_next = self.target_net(b_s_).detach()  # detach from graph, don't backpropagate
         q_target = b_r + GAMMA * q_next.max(1)[0].view(BATCH_SIZE, 1)  # shape (batch, 1)
