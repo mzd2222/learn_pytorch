@@ -1,18 +1,18 @@
 import gym
+import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-import numpy as np
 
 env = gym.make('Breakout-v0')
 
 LR = 0.01
 BATCH_SIZE = 32
 
-MEMORYCOUNT = 1500
+MEMORYCOUNT = 2500
 TARGET_REPLACE_ITER = 100
 
-EPSILON = 0.9
+EPSILON = 0.8
 GAMMA = 0.9
 
 N_ACTIONS = env.action_space.n  # 4
@@ -62,8 +62,15 @@ class DQN(object):
         self.optimizer = torch.optim.Adam(self.eval_net.parameters(), lr=LR)
         self.loss_func = nn.MSELoss()
 
-    def choose_action(self, x):
-        x = torch.unsqueeze(torch.FloatTensor(x), 0)
+        self.eval_net.cuda()
+        self.target_net.cuda()
+        self.loss_func.cuda()
+
+    def choose_action(self, x1):
+        x = torch.unsqueeze(torch.FloatTensor(x1), 0)
+
+        x = x.cuda()
+
         # input only one sample
         if np.random.uniform() < EPSILON:  # greedy
             actions_value = self.eval_net(x)
@@ -101,6 +108,11 @@ class DQN(object):
         b_r = torch.FloatTensor(np.stack(b_memory[:, 2])).view(BATCH_SIZE, -1)
         b_s_ = torch.FloatTensor(np.stack(b_memory[:, 3]))
 
+        b_s = b_s.cuda()
+        b_a = b_a.cuda()
+        b_r = b_r.cuda()
+        b_s_ = b_s_.cuda()
+
         # q_eval w.r.t the action in experience
         # print('b_s:', self.eval_net(b_s).size(), 'b_a', b_a.size())
         q_eval = self.eval_net(b_s).gather(1, b_a)  # shape (batch, 1)
@@ -118,7 +130,7 @@ dqn = DQN()
 
 max_core = 0
 
-for i in range(5):
+for i in range(25):
     s = env.reset()
     ep_r = 0
     while True:
@@ -138,9 +150,10 @@ for i in range(5):
         if dqn.memory_counter > MEMORYCOUNT:
             dqn.learn()
 
-            if EPSILON < 0.96:
+            if EPSILON < 0.90:
                 EPSILON = EPSILON * 1.00001
             if done:
+                print(EPSILON)
                 print('Ep: ', i,
                       '| Ep_r: ', round(ep_r, 2),
                       '| EPSILON: ', round(EPSILON, 2))
