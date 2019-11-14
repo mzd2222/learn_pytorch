@@ -12,7 +12,7 @@ BATCH_SIZE = 32
 MEMORYCOUNT = 1500
 TARGET_REPLACE_ITER = 100
 
-EPSILON = 0.9
+EPSILON = 0.5
 GAMMA = 0.9
 
 N_ACTIONS = env.action_space.n  # 4
@@ -118,7 +118,7 @@ dqn = DQN()
 
 max_core = 0
 
-for i in range(5):
+for i in range(25):
     s = env.reset()
     ep_r = 0
     while True:
@@ -138,8 +138,8 @@ for i in range(5):
         if dqn.memory_counter > MEMORYCOUNT:
             dqn.learn()
 
-            if EPSILON < 0.96:
-                EPSILON = EPSILON * 1.00001
+            if EPSILON < 0.92:
+                EPSILON = EPSILON * 1.00003
             if done:
                 print('Ep: ', i,
                       '| Ep_r: ', round(ep_r, 2),
