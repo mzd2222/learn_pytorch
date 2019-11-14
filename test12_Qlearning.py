@@ -12,7 +12,7 @@ BATCH_SIZE = 32
 MEMORYCOUNT = 2500
 TARGET_REPLACE_ITER = 100
 
-EPSILON = 0.8
+EPSILON = 0.5
 GAMMA = 0.9
 
 N_ACTIONS = env.action_space.n  # 4
@@ -152,6 +152,8 @@ for i in range(25):
 
             if EPSILON < 0.90:
                 EPSILON = EPSILON * 1.00001
+            if EPSILON < 0.92:
+                EPSILON = EPSILON * 1.00003
             if done:
                 print(EPSILON)
                 print('Ep: ', i,
