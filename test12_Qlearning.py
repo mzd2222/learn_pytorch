@@ -6,31 +6,33 @@ import torch.nn.functional as F
 
 env = gym.make('Breakout-v0')
 
-LR = 0.01
-BATCH_SIZE = 32
+LR = 0.03
+BATCH_SIZE = 48
+TIMEZONE = 6
 
-MEMORYCOUNT = 2500
-TARGET_REPLACE_ITER = 100
+MEMORYCOUNT = 2000
+TARGET_REPLACE_ITER = 20
 
-EPSILON = 0.5
+EPSILON = 0.1
 GAMMA = 0.9
 
 N_ACTIONS = env.action_space.n  # 4
-N_STATES = 210 * 160 * 3  # (210, 160, 3)
+
+
+# N_STATES = 210 * 160 * 3  # (210, 160, 3)
 
 
 class CNN(nn.Module):
     def __init__(self):
         super(CNN, self).__init__()
-        self.conv1 = nn.Conv2d(3, 32, 5, 1, 2)  #
+        self.conv1 = nn.Conv2d(3, 32, 3, 1, 1)  #
         self.conv1.weight.detach().normal_(0, 0.1)
-        self.conv2 = nn.Conv2d(32, 64, 5, 1, 2)
+        self.conv2 = nn.Conv2d(32, 64, 3, 1, 1)
         self.conv2.weight.detach().normal_(0, 0.1)
-        self.conv3 = nn.Conv2d(64, 128, 5, 1, 2)
+        self.conv3 = nn.Conv2d(64, 128, 3, 1, 1)
         self.conv3.weight.detach().normal_(0, 0.1)
-        self.conv4 = nn.Conv2d(128, 256, 3, 1, 1)
-        self.conv4.weight.detach().normal_(0, 0.1)
-        self.linear1 = nn.Linear(256 * 13 * 10, 128)
+
+        self.linear1 = nn.Linear(27648, 128)
         self.linear1.weight.detach().normal_(0, 0.1)
         self.linear2 = nn.Linear(128, 64)
         self.linear2.weight.detach().normal_(0, 0.1)
@@ -38,11 +40,10 @@ class CNN(nn.Module):
         self.linear3.weight.detach().normal_(0, 0.1)
 
     def forward(self, input):
-        x = input.view(input.size(0), 3, 210, 160)  # 1, 3, 210, 160
-        x = F.max_pool2d(F.relu(self.conv1(x)), 2)
-        x = F.max_pool2d(F.relu(self.conv2(x)), 2)
+        x = input.view(input.size(0), 3, 96, 146)  # 1, 3, 96, 146
+        x = F.max_pool2d(F.relu(self.conv1(x)), 2)  # 48 73
+        x = F.max_pool2d(F.relu(self.conv2(x)), 2)  #
         x = F.max_pool2d(F.relu(self.conv3(x)), 2)  # 1, 128, 26 ,20
-        x = F.max_pool2d(F.relu(self.conv4(x)), 2)  # 1, 256, 13 ,10
 
         x = x.view(x.size(0), -1)
 
@@ -66,8 +67,8 @@ class DQN(object):
         self.target_net.cuda()
         self.loss_func.cuda()
 
-    def choose_action(self, x1):
-        x = torch.unsqueeze(torch.FloatTensor(x1), 0)
+    def choose_action(self, x):
+        x = torch.unsqueeze(torch.FloatTensor(x), 0)
 
         x = x.cuda()
 
@@ -79,6 +80,7 @@ class DQN(object):
         else:  # random
             action = np.random.randint(0, N_ACTIONS)
             # action = action if ENV_A_SHAPE == 0 else action.reshape(ENV_A_SHAPE)
+
         return action
 
     def store_transition(self, s, a, r, s_):
@@ -129,33 +131,46 @@ class DQN(object):
 dqn = DQN()
 
 max_core = 0
+memory = []
+for i in range(TIMEZONE):
+    memory.append(0)
 
-for i in range(25):
+for i in range(100):
     s = env.reset()
+    time = 0
     ep_r = 0
+    for kkk in range(TIMEZONE):
+        memory[kkk] = s
+    a_m = np.zeros(TIMEZONE)
     while True:
+
         env.render()
 
-        action = dqn.choose_action(s)
-        # print(action)
+        s_save = np.array(memory)
+        s_save = s_save[:, 100:196, 7:-7, :]
+        s_save = np.dot(s_save[..., :3], [0.299, 0.587, 0.114])
+        s_save = np.stack(s_save)
 
-        # take action
+        action = dqn.choose_action(s_save[:int(TIMEZONE / 2), :, :])
         s_, r, done, info = env.step(action)
 
-        dqn.store_transition(s, action, r, s_)
-        # s_ = np.array(s_) / np.max(s_) - 0.001  # 归一化
-        # s_t = torch.unsqueeze(torch.tensor(s_, dtype=torch.float32), dim=0)
+        memory[time % TIMEZONE] = s_
+        a_m[time % TIMEZONE] = action
+
+        dqn.store_transition(s_save[:int(TIMEZONE / 2), :, :], a_m[int(TIMEZONE / 2) - 1], r * 2,
+                             s_save[int(TIMEZONE / 2):, ...])
+
+        # plt.imshow(s_save[-1], cmap="gray")
+        # plt.show()
+
         ep_r += r
 
         if dqn.memory_counter > MEMORYCOUNT:
             dqn.learn()
 
-            if EPSILON < 0.90:
-                EPSILON = EPSILON * 1.00001
             if EPSILON < 0.92:
-                EPSILON = EPSILON * 1.00003
+                EPSILON = EPSILON * 1.0003
             if done:
-                print(EPSILON)
                 print('Ep: ', i,
                       '| Ep_r: ', round(ep_r, 2),
                       '| EPSILON: ', round(EPSILON, 2))
@@ -167,5 +182,6 @@ for i in range(25):
             break
 
         s = s_
+        time = time + 1
 
 env.close()
