@@ -1,5 +1,5 @@
 from env import Maze
-from test14_Rlearning2_1 import QLearningTable
+from test15_Sarsa_1 import QLearningTable
 
 
 def update():
@@ -7,16 +7,19 @@ def update():
 
         observation = env.reset()
 
+        action = RL.choose_action(str(observation))
+
         while True:
             env.render()
 
-            action = RL.choose_action(str(observation))
-
             observation_, r, done = env.step(action)
 
-            RL.learn(str(observation), action, r, str(observation_))
+            action_ = RL.choose_action(str(observation_))
+
+            RL.learn(str(observation), action, r, str(observation_), action_)
 
             observation = observation_
+            action = action_
 
             if done:
                 break

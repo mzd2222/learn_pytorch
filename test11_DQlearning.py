@@ -5,6 +5,12 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+# DQN三种改进  1.double DQN   2.记忆重要性排序  3.输出层变为两层
+
+
+global losses
+losses = []
+
 # Hyper Parameters
 BATCH_SIZE = 32
 LR = 0.01  # learning rate
@@ -85,7 +91,7 @@ class Net(nn.Module):
 #
 
 
-#
+# dueling
 #
 ##############################################################
 class DQN(object):
@@ -136,7 +142,7 @@ class DQN(object):
         b_s_ = torch.FloatTensor(b_memory[:, -N_STATES:])
 
         # q_eval w.r.t the action in experience
-        print('b_s:', self.eval_net(b_s).size(), 'b_a', b_a.size())
+        # print('b_s:', self.eval_net(b_s).size(), 'b_a', b_a.size())
         q_eval = self.eval_net(b_s).gather(1, b_a)  # shape (batch, 1)
         q_next = self.target_net(b_s_).detach()  # detach from graph, don't backpropagate
         q_target = b_r + GAMMA * q_next.max(1)[0].view(BATCH_SIZE, 1)  # shape (batch, 1)
@@ -145,19 +151,21 @@ class DQN(object):
         self.optimizer.zero_grad()
         loss.backward()
         self.optimizer.step()
+        a = loss.detach().numpy()
+        losses.append(np.mean(a))
 
 
 max_core = 0
 dqn = DQN()
 draw = []
 print('\nCollecting experience...')
-for i_episode in range(300):
+for i_episode in range(180):
     s = env.reset()
     # print(s)
     # exit(0)
     ep_r = 0
     while True:
-        # env.render()
+        env.render()
         a = dqn.choose_action(s)
 
         # take action
@@ -193,5 +201,5 @@ for i_episode in range(300):
 
 draw = np.array(draw)
 env.close()
-plt.plot(draw[:, 1])
+plt.plot(losses)
 plt.show()
